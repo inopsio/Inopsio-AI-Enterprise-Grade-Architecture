@@ -1,0 +1,33 @@
+# Python bytecode
+__pycache__
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv
+venv
+env
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Environment files
+.env
+.env.local
+
+# Logs
+*.log
+
+# Testing
+.pytest_cache
+.coverage
+htmlcov
+
+# OS
+.DS_Store
+
+# Alembic
+alembic/versions/*.pyc

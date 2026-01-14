@@ -1,0 +1,51 @@
+// backend/prisma/schema.prisma
+// Inopsio AI Enterprise Grade Architecture - Multi-Tenant Schema
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-py"
+}
+
+// 1. ORGANIZATION (The Tenant)
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  plan      String   @default("free") // free, pro, enterprise
+  
+  // Relations
+  members   Member[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 2. USER (The Identity)
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  hashedPassword String
+  fullName       String?
+  isActive       Boolean  @default(true)
+  
+  // Relations
+  memberships    Member[]
+  createdAt      DateTime @default(now())
+}
+
+// 3. MEMBER (The Link with Permissions)
+model Member {
+  id             String       @id @default(uuid())
+  role           String       @default("member") // owner, admin, member
+  
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+}

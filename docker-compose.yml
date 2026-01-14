@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # 1. DATABASE (PostgreSQL)
+  # ---------------------------------------------------------------------------
+  db:
+    image: postgres:15-alpine
+    container_name: inopsio-db
+    restart: always
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-inopsio_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-securepassword}
+      POSTGRES_DB: ${POSTGRES_DB:-inopsio_db}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-inopsio_admin} -d ${POSTGRES_DB:-inopsio_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - inopsio_network
+
+  # ---------------------------------------------------------------------------
+  # 2. BACKEND (FastAPI)
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: inopsio-backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Internal connection to DB (uses service name 'db')
+      DATABASE_URL: postgresql://${POSTGRES_USER:-inopsio_admin}:${POSTGRES_PASSWORD:-securepassword}@db:5432/${POSTGRES_DB:-inopsio_db}
+      # Security settings
+      SECRET_KEY: ${BACKEND_SECRET_KEY}
+      # CORS: Allow the frontend domain to fetch data
+      CORS_ORIGINS: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+    ports:
+      - "8000:8000"
+    networks:
+      - inopsio_network
+
+  # ---------------------------------------------------------------------------
+  # 3. FRONTEND (Next.js 16)
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      # Next.js needs this URL *during the build* to bake it into client-side JS
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    container_name: inopsio-frontend
+    restart: always
+    depends_on:
+      - backend
+    environment:
+      # Runtime variable for Node.js server-side calls
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    networks:
+      - inopsio_network
+
+# Define a shared network so services can talk to each other
+networks:
+  inopsio_network:
+    driver: bridge
+
+# Persist database data so it survives restarts
+volumes:
+  postgres_data:
